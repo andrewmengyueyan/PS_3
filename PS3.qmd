@@ -1,0 +1,418 @@
+---
+title: "PS3"
+format: html
+editor: visual
+---
+
+My github link is <https://github.com/andrewmengyueyan/PS_3>
+
+## Problem 1
+
+Stata code and output
+
+#### a. 
+
+```         
+. do "E:\study\Stat 506\PS3-Q1.do"
+. import sasxport5 "E:\study\Stat 506\PS3-data\DEMO_D.XPT", clear
+
+. save "E:\study\Stat 506\PS3-data\tempfile.dta", replace
+(file E:\study\Stat 506\PS3-data\tempfile.dta not found)
+file E:\study\Stat 506\PS3-data\tempfile.dta saved
+
+. clear
+
+. import sasxport5 "E:\study\Stat 506\PS3-data\VIX_D.XPT", clear
+
+. merge 1:1 seqn using "E:\study\Stat 506\PS3-data\tempfile.dta", keep(matched)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             6,980  (_merge==3)
+    -----------------------------------------
+
+. drop _merge
+
+. erase "E:\study\Stat 506\PS3-data\tempfile.dta"
+
+. save "E:\study\Stat 506\PS3-data\MergedData.dta", replace
+file E:\study\Stat 506\PS3-data\MergedData.dta saved
+
+. count
+  6,980
+```
+
+#### b. 
+
+```         
+. summarize ridageyr
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    ridageyr |      6,980    37.87894    21.89424         12         85
+
+. // I first inspect the descriptive statistics of the dataset, and find that the range of ridageyr is [12, 85], so I then make the partitions below.
+. 
+. egen age_group = cut(ridageyr), at(10, 20, 30, 40, 50, 60, 70, 80, 90) icodes    
+
+. // I cut the ridageyr into partitions, and give each partition a label, for example, 12-19 is 0, 20-29 is 1, 30-39 is 2, 40-49 is 3, 50-59 is 4, 60-69 is 5, 70-79 is 6, 80-85 is 7.
+. 
+. // The original values in viq220 is not intuitive, I want to replace them with "Yes", "No", "Not Known"
+. gen glasses_recoded_str = string(viq220) 
+
+. replace glasses_recoded_str = "1 Yes" if glasses_recoded_str == "1"
+variable glasses_recoded_str was str1 now str5
+(2,765 real changes made)
+
+. replace glasses_recoded_str = "2 No" if glasses_recoded_str == "2"
+(3,780 real changes made)
+
+. replace glasses_recoded_str = "9 Not Known" if glasses_recoded_str == "9"
+variable glasses_recoded_str was str5 now str11
+(2 real changes made)
+
+. 
+. // Generate the frequency table
+. table (age_group) (glasses_recoded_str) if glasses_recoded_str != ".", statistic(proportion)
+
+---------------------------------------------------
+          |            glasses_recoded_str         
+          |   1 Yes     2 No   9 Not Known    Total
+----------+----------------------------------------
+age_group |                                        
+  0       |   .1023    .2166                  .3189
+  1       |  .04674   .09638      .0003055    .1434
+  2       |  .04109   .07347                  .1146
+  3       |  .04368   .07439                  .1181
+  4       |  .05117   .04185                 .09302
+  5       |  .05987   .03635                 .09623
+  6       |  .04567   .02261                 .06828
+  7       |  .03177   .01573                  .0475
+  Total   |   .4223    .5774      .0003055        1
+---------------------------------------------------
+In age_group, 0 represents 12-19, 1 represents 20-29, 2 represents 30-39, 3 represents 40-49, 4 represents 50-59, 5 represents 60-69, 6 represents 70-79, 7 represents 80-85. 
+. The first column shows the proportion of respondents within each 10-year age bracket who wear glasses/contact lenses for distance vision
+. 
+```
+
+#### c. 
+
+```         
+. // 1. First, we fit the logistic regression model between viq220 and age
+. // I searched online and learned that when performing logistic regression in Stata, missing values are automatically ignored. Because I don't have to go out of my way to clean the data.
+. // In logistic regression, the response should only have 2 classes. 9 indicates "Not Known", so I delete the observations having viq220 == 9.
+. drop if viq220 == 9 
+(2 observations deleted)
+
+. // In logistic regression, the response usually has value 0 and 1, otherwise it will not work normally. So I replace viq220 == 2 with viq220 == 0. Then 1 indicates that the respondent wear glasses or contact lenses for distance vision, and 0 indicates the opposite.
+. replace viq220 = 0 if viq220 == 2 
+(3,780 real changes made)
+
+. 
+. logistic viq220 ridageyr
+. estat ic
+
+Logistic regression                                     Number of obs =  6,545
+                                                        LR chi2(1)    = 443.37
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -4235.9433                             Pseudo R2     = 0.0497
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |    1.02498   .0012356    20.47   0.000     1.022561    1.027405
+       _cons |    .283379   .0151461   -23.59   0.000     .2551952    .3146755
+-----------------------------------------------------------------------------
+       Model |          N   ll(null)  ll(model)      df        AIC        BIC
+-------------+---------------------------------------------------------------
+           . |      6,545  -4457.627  -4235.943       2   8475.887    8489.46
+-----------------------------------------------------------------------------
+Note: BIC uses N = number of observations. See [R] IC note.
+
+. 
+.
+. // 2. Secondly, we fit the logistic regression between viq220 and age, race and gender.
+. logistic viq220 ridageyr ridreth1 i.riagendr
+. estat ic
+
+Logistic regression                                     Number of obs =  6,545
+                                                        LR chi2(3)    = 564.76
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -4175.2478                             Pseudo R2     = 0.0633
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |   1.025324   .0012549    20.43   0.000     1.022867    1.027786
+    ridreth1 |    1.13275   .0254723     5.54   0.000     1.083909    1.183791
+  2.riagendr |   1.645628   .0866472     9.46   0.000     1.484271    1.824526
+       _cons |   .1511379   .0134607   -21.22   0.000     .1269297    .1799632
+------------------------------------------------------------------------------
+
+       Model |          N   ll(null)  ll(model)      df        AIC        BIC
+-------------+---------------------------------------------------------------
+           . |      6,545  -4457.627  -4175.248       4   8358.496   8385.641
+-----------------------------------------------------------------------------
+Note: BIC uses N = number of observations. See [R] IC note.
+
+. 
+.
+. // 3. Thirdly, we fit the logistic regression model between viq220, race, gender and Poverty Income Ratio
+. logistic viq220 ridageyr ridreth1 riagendr indfmpir
+. estat ic
+
+Logistic regression                                     Number of obs =  6,247
+                                                        LR chi2(4)    = 588.32
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -3965.3948                             Pseudo R2     = 0.0691
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |   1.024047   .0012924    18.83   0.000     1.021517    1.026583
+    ridreth1 |   1.097216   .0258548     3.94   0.000     1.047693    1.149079
+    riagendr |   1.679667   .0909057     9.58   0.000     1.510619    1.867631
+    indfmpir |    1.15327    .019618     8.38   0.000     1.115453    1.192368
+       _cons |   .0717786   .0092205   -20.51   0.000     .0558023    .0923289
+-----------------------------------------------------------------------------
+       Model |          N   ll(null)  ll(model)      df        AIC        BIC
+-------------+---------------------------------------------------------------
+           . |      6,247  -4259.553  -3965.395       5    7940.79   7974.489
+-----------------------------------------------------------------------------
+Note: BIC uses N = number of observations. See [R] IC note.
+
+. 
+```
+
+#### d. 
+
+```         
+. // Discussion: From the third model in part c, the odds of men and women being wears of glasess/contact lenses for distance vision is 1.679667, which means that the probability that men being wears of glasses/contact lenses for distance is 1.679667 times of women. 
+. 
+. // Test: We use hypothesis test to test whether the proportion of wearers of glasses/contact lenses for distance vision differs between men and women. Let the prop(1) be the proportion of men wearing glasess/contact lenses and prop(2) be the proportion of women doing that. Diff is the difference between prop(1) and prop(2), that is diff = prop(1) - prop(2). H0: diff = 0, Ha: diff != 0.
+. 
+. prtest viq220, by(riagendr)
+
+Two-sample test of proportions                     1: Number of obs =     3195
+                                                   2: Number of obs =     3350
+------------------------------------------------------------------------------
+       Group |       Mean   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+           1 |   .3696401   .0085398                      .3529023    .3863778
+           2 |   .4728358   .0086259                      .4559293    .4897423
+-------------+----------------------------------------------------------------
+        diff |  -.1031958   .0121382                     -.1269861   -.0794054
+             |  under H0:   .0122146    -8.45   0.000
+------------------------------------------------------------------------------
+        diff = prop(1) - prop(2)                                  z =  -8.4485
+    H0: diff = 0
+
+    Ha: diff < 0                 Ha: diff != 0                 Ha: diff > 0
+ Pr(Z < z) = 0.0000         Pr(|Z| > |z|) = 0.0000          Pr(Z > z) = 1.0000
+
+. 
+. // The result is that p-value is 0.000, which means we can reject the null hypothesis. So we conclude that the proportion of men and women wearing glasses is significantly different. 
+. 
+end of do-file
+```
+
+## Problem 2
+
+```{r}
+library(DBI)
+library(RSQLite)
+sakila <- dbConnect(RSQLite::SQLite(), "E:/study/Stat 506/PS3-data/sakila_master.db")
+sakila
+```
+
+#### a.
+
+```{r}
+dbGetQuery(sakila, "select * from language")
+dbGetQuery(sakila, "select l.name, count(*) as count_language
+from film as f
+left join language as l on f.language_id = l.language_id
+group by l.name
+           ")
+```
+
+#### b.
+
+##### 1. Use SQL query or queries to extract the appropriate table(s), then use regular R to answer the question:
+
+##### SQL part
+
+```{r}
+df_1 <- dbGetQuery(sakila, "select c.film_id as film_id, f.title as film_title, c.category_id as category_id, n.name as genre 
+           from film_category as c 
+           left join film as f on c.film_id = f.film_id 
+           left join category as n on c.category_id = n.category_id")
+head(df_1)
+```
+
+##### R part
+
+```{r}
+genre_freq <- table(df_1$genre)
+max_genre_index <- which.max(genre_freq)
+genre_freq[max_genre_index]
+```
+
+Sports movie is the most common genre; 74 movies are of sports genre.
+
+##### 2. Use a single SQL query to answer the question:
+
+```{r}
+dbGetQuery(sakila, "select m.genre, count (*) as genre_count 
+from (select c.film_id as film_id, f.title as film_title, c.category_id as category_id, n.name as genre 
+           from film_category as c 
+           left join film as f on c.film_id = f.film_id 
+           left join category as n on c.category_id = n.category_id) as m
+           group by m.genre
+           order by - genre_count")
+```
+
+It can be seen that Sports movie is the most common genre; 74 movies are of sports genre.
+
+#### c.
+
+##### 1. Use SQL query or queries to extract the appropriate table(s), then use regular R to answer the question:
+
+##### SQL part
+
+```{r}
+df_2 <- dbGetQuery(sakila, "select new.country, count(*) as country_count from 
+(select cu.customer_id, cu.address_id, ad.city_id, ci.city, co.country from 
+           customer as cu
+           left join address as ad on cu.address_id = ad.address_id
+           left join city as ci on ad.city_id = ci.city_id
+           left join country as co on ci.country_id = co.country_id) as new
+           group by new.country")
+head(df_2)
+```
+
+##### R part
+
+```{r}
+country_with_9_Customers_index <- which(df_2$country_count == 9)
+df_2[country_with_9_Customers_index,]
+```
+
+The United Kingdom is the only country that has exactly 9 customers.
+
+##### 2. Use a single SQL query to answer the question:
+
+```{r}
+dbGetQuery(sakila, "select new.country, count(*) as country_count from 
+(select cu.customer_id, cu.address_id, ad.city_id, ci.city, co.country from 
+           customer as cu
+           left join address as ad on cu.address_id = ad.address_id
+           left join city as ci on ad.city_id = ci.city_id
+           left join country as co on ci.country_id = co.country_id) as new
+           group by new.country
+           having country_count = 9")
+```
+
+The United Kingdom is the only country that has exactly 9 customers.
+
+## Problem 3
+
+```{r}
+us500 <- read.csv("E:/study/Stat 506/PS3-data/us-500.csv")
+```
+
+#### a.
+
+```{r}
+TLD_net <- sum(grepl(".net", us500$email))
+TLD <- nrow(us500)
+TLD_net_prop <- gsub(" ", "", paste((TLD_net/TLD)*100, "%", collapse = ""))
+print(TLD_net_prop)
+```
+
+#### b.
+
+First I want to detect how many non-alphanumeric characters are in the "@domain".
+
+```{r}
+library(stringr)
+email <- us500$email
+count_non_alphanum <- function(email) {
+  domain <- str_extract(email, "@(.*)")
+  non_alnum_count <- sum(str_count(domain, "[^A-Za-z0-9]"))
+  return(non_alnum_count)
+}
+non_alnum_counts <- sapply(email, count_non_alphanum)
+sum(non_alnum_counts == 2) == length(email)
+```
+
+The results show that in the domain, there are no other non-alphanumeric characters except ".". So we can just count the number of usernames that have a non-alphanumeric character(s).
+
+```{r}
+usernames <- sapply(strsplit(us500$email, "@"), "[[", 1)
+contains_non_alphanumeric <- grepl("[^A-Za-z0-9]", usernames)
+proportion_with_non_alphanumeric <- mean(contains_non_alphanumeric)
+gsub(" ", "", paste(proportion_with_non_alphanumeric*100, "%", collapse = ""))
+
+```
+
+#### c.
+
+```{r}
+all_area_codes <- c(substr(us500$phone1, 1, 3), substr(us500$phone2, 1, 3))
+area_code_counts <- table(all_area_codes)
+max_count <- max(area_code_counts)
+most_frequent_area_codes <- names(area_code_counts[area_code_counts == max_count])
+cat("The most common area code is", most_frequent_area_codes, "\n")
+
+```
+
+Because there are two columns of phone numbers, so I merged them first. But I found that the area code of the same observation are the same for every observation.
+
+The most common area code is 973.
+
+#### d.
+
+```{r}
+us500$ApartmentNumber <- gsub(".*#(\\d+).*", "\\1", us500$address)
+us500$ApartmentNumber <- as.numeric(us500$ApartmentNumber)
+log_apartment_numbers <- log(us500$ApartmentNumber[!is.na(us500$ApartmentNumber)])
+hist(log_apartment_numbers, main = "Log of Apartment Numbers", xlab = "Log(Apartment Number)")
+
+```
+
+#### e.
+
+```{r}
+par(mfrow=c(1,2))
+leading_digit_ap <- as.numeric(substr(na.omit(us500$ApartmentNumber), 1, 1))
+hist(leading_digit_ap, main = "Leading Digits of Apartment Numbers", xlab = "Leading Digits")
+
+n <- length(leading_digit_ap)
+benford_prob <- log10(1+1/(1:9))
+benford_leading_num <- sample(1:9, n, replace = TRUE, prob = benford_prob)
+hist(benford_leading_num, main = "Benford Leading Numbers", xlab = "Numbers")
+par(mfrow=c(1,1))
+```
+
+From the histogram of the leading digits of apartment numbers, I conclude that they do not obey the Benford's rule, compared with the histogram of numbers which follow Benford's law.
+
+#### f.
+
+From the Wikipedia link given by the professor, I found that the further back a digit is in an array, the more likely it is that it is any number from 0 to 9, which is uniformly distributed, which is the generalization to digits beyond the first one.
+
+```{r}
+par(mfrow = c(1, 2))
+
+us500$street_number <- as.numeric(sub(" .*", "", na.omit(us500$address)))
+last_digit_st <- us500$street_number%%10
+hist(last_digit_st, main = "Last Digits of Street Numbers", xlab = "Last Digits")
+
+m <- length(last_digit_st)
+benford_last_num <- runif(m, 0, 9)
+hist(benford_last_num, main = "Benford Numbers", xlab = "Last Numbers")
+par(mfrow = c(1, 1))
+```
+
+This is the generalization of Benford's first digit law. Actually, the last digits don't obey Benford's first digit law because they seem to follow the Uniform Distribution, while the uniform distribution doesn't obey Benford's law. By comparing the histogram of the last digit of the street number with the histogram of the same number of uniformly distributed 0-9, I found that the shapes of the two histograms are very similar, so I concluded that the last digit of the street number follows the generalization to digits beyond the first digit but don't obey Benford's law itself.
